@@ -20,7 +20,15 @@ This tool exploits a [vulnerability](https://fredericb.info/2021/02/amlogic-usbd
 
 ## Scripts
 * all.sh		
-* Dump bootloader+dtb, convert dtb to dts, dump efuse/sram extract asekey and iv,decrypt bootloader.
+* Dump bootloader+dtb+boot
+* Convert dtb to dts
+* Dump efuse extract bl2 asekey and iv 
+* Decrypt bootloader
+* Extract u-boot
+* Decrypt u-boot
+* Decrypt boot 
+* Extract bl3xaeskey+kernelaeskes
+* 
 * All files be in dump_all dir.
 
 ## Usage
@@ -36,8 +44,13 @@ To put box to usbdl mod with toopick in AV hole on box push button and connect b
 * All files be in dump_all dir.
 * bl2aeskey -Bootloader(BL2) aeskey used for decrypt bootloader.
 * bl2aesiv  -Bootloader(BL2) initialization vector(IV)used for decrypt bootloader.bin.
+* bl3xaeskey -U-boot aeskey
+* kernelaeskey - Kernel aeskey
 * bootloader.bin -Dumped main bootloader from box(BL2,FIP,BL3.1,BL33(U-boot)).
 * bootloader_dec.bin -Decrypted bootloader.bin
+* Extract -u-boot
+* Decrypt -u-boot
+* Decrypt -boot/kernel
 * dtb.bin  -Device tree blob binary 
 * dtb_dts  -Device tree blob txt
 * root_rsa_keys.sha -sha256 of rootkeys used for encrypt booloader.

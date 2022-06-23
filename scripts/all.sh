@@ -1,7 +1,7 @@
 #!/bin/bash
 
 #set -x 
-set -o pipefail
+#set -o pipefail
 
 debug=0
 RED='\033[0;31m'
@@ -96,7 +96,7 @@ run_dump_bootloader()
     local cmd
     local need_spaces
 
-    cmd="../bin/update mread store bootloader normal 0x200000 bootloader.bin"
+    cmd="../bin/update mread store bootloader normal 0x13aa00 bootloader.bin"
     need_spaces=0
     if [[ "$1" == "bulkcmd" ]] || [[ "$1" == "tplcmd" ]]; then
        need_spaces=1
@@ -127,6 +127,44 @@ run_dump_bootloader()
     print_debug ""
     return 0
 }
+
+run_dump_boot()
+{
+    local cmd
+    local need_spaces
+
+    cmd="../bin/update mread store boot normal 0x948c00 boot.bin"
+    need_spaces=0
+    if [[ "$1" == "bulkcmd" ]] || [[ "$1" == "tplcmd" ]]; then
+       need_spaces=1
+    fi
+    cmd+=" $1"
+    shift 1
+
+    for arg in "$@"; do
+        if [[ "$arg" =~ ' ' ]]; then
+           cmd+=" \"     $arg\""
+        else
+           if [[ $need_spaces == 1 ]]; then
+              cmd+=" \"     $arg\""
+           else
+              cmd+=" $arg"
+           fi
+        fi
+    done
+
+    update_return=""
+    print_debug "\nCommand ->$CYAN $cmd $RESET"
+    if [[ "$simu" != "1" ]]; then
+       update_return=`eval "$cmd"`
+    fi
+    print_debug "- Results ---------------------------------------------------"
+    print_debug "$RED $update_return $RESET"
+    print_debug "-------------------------------------------------------------"
+    print_debug ""
+    return 0
+}
+
 
 run_dump_dtb()
 {
@@ -224,11 +262,15 @@ echo "Dump DTB'S"
 
 run_dump_dtb
 
+echo "Dump Boot"
+
+run_dump_boot
+
 echo "Reboot to BL1"
 
 run_reboot_BL1
 
-sleep 10
+sleep 5
 
 echo "Dump Efuse 0xFFFE0000"
 
@@ -255,14 +297,62 @@ echo "Decrypt bootloader"
 
 openssl enc -aes-256-cbc -nopad -d -K $aeskey -iv $ivkey -in bootloader.bin -out bootloader_dec.bin
 
-echo "Dtb_to_Dts"
+echo "Extract All"
+
+dd if=bootloader_dec.bin skip=8 count=120 of=bl2_cfg.bin status=none
+dd if=bootloader_dec.bin skip=128 count=32 of=fip.bin status=none
+dd if=bootloader_dec.bin bs=1 skip=680 count=1036 of=bl2key.bin status=none
+dd if=bootloader_dec.bin bs=1 skip=2928 count=1036 of=rootkey.bin status=none
+dd if=bootloader.bin bs=1 skip=500736 count=787968 of=u-boot_enc.bin status=none
+#dd >/dev/null if=boot.bin bs=1 skip=2304 count=9734268 of=boot_enc.bin status=none
+
+
+
+echo -n `hexdump -ve '1/1 "%.2X"' -n 0x20 -s 0x1b4 fip.bin` >> bl3xaeskey
+echo -n `hexdump -ve '1/1 "%.2X"' -n 0x20 -s 0x1354 fip.bin` >> kernelaeskey
+
+echo "Decrypt U-boot"
+
+file=$(cat bl3xaeskey)
+for bl3xaeskey in $file
+do
+echo >/dev/null "$bl3xaeskey\n"
+done
+
+file=$(cat bl2ivkey)
+for ivkey in $file
+do
+echo >/dev/null "$ivkey\n"
+done
+
+openssl enc -aes-256-cbc -nopad -d -K $bl3xaeskey -iv $ivkey -in u-boot_enc.bin -out u-boot_dec.bin
+
+echo "Decrypt Boot"
+
+file=$(cat kernelaeskey)
+for kernelaeskey in $file
+do
+echo >/dev/null "$kernelaeskey\n"
+done
+
+file=$(cat bl2ivkey)
+for ivkey in $file
+do
+echo >/dev/null "$ivkey\n"
+done
+
+openssl enc -aes-256-cbc -nopad -d -K $kernelaeskey -iv $ivkey -in boot.bin -out boot_dec.bin
+
+echo "Extract_DTB"
 
 ../python/extract-dtb -o dts dtb.bin
 
+echo "DTB_to_DTS"
+
+cd dts
+
+dtc -q -I dtb -O dts -o dts1 01_dtbdump_Amlogic.dtb
+dtc -q -I dtb -O dts -o dts2 02_dtbdump_Amlogic.dtb
+
+
 echo "Done"
-
-
-
-
-
-
